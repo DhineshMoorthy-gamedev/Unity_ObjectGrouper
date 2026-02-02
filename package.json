@@ -1,0 +1,12 @@
+{
+    "name": "com.dhinesh.object-grouper",
+    "version": "1.0.0",
+    "displayName": "Object Grouper",
+    "description": "An advanced tool for organizing GameObjects into groups with powerful naming, parenting, and cleanup options.",
+    "unity": "2021.3",
+    "author": {
+        "name": "Dhinesh",
+        "email": "dhinesh@example.com",
+        "url": "https://github.com/Dhinesh"
+    }
+}
