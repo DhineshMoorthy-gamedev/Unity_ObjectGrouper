@@ -11,11 +11,17 @@ namespace UnityTools.ObjectGrouper.Data
         public string Name;
         public Color GroupColor = Color.white;
         
+        public string ParentID; // Support for nested groups
+        public GroupType Type = GroupType.Selection;
+        public string Description;
+        public List<string> Tags = new List<string>();
+
         // We store GlobalObjectId strings to be scene-agnostic and persistent
         public List<string> ObjectGlobalIDs = new List<string>();
 
         public bool IsVisible = true;
         public bool IsLocked = false;
+        public bool IsExpanded = true; // UI state
 
         public ObjectGroup()
         {
@@ -33,5 +39,12 @@ namespace UnityTools.ObjectGrouper.Data
         {
             return Color.HSVToRGB(UnityEngine.Random.value, 0.6f, 0.9f);
         }
+    }
+
+    public enum GroupType
+    {
+        Selection, // Manual grouping
+        Folder,    // Organizational only
+        Smart      // Rule-based grouping
     }
 }

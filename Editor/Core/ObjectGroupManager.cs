@@ -12,6 +12,7 @@ namespace UnityTools.ObjectGrouper.Core
     [FilePath("ProjectSettings/ObjectGrouperData.json", FilePathAttribute.Location.ProjectFolder)]
     public class ObjectGroupManager : ScriptableSingleton<ObjectGroupManager>
     {
+        public bool IsInitialized => _currentData != null;
         private GrouperData _currentData = new GrouperData();
         
         // Cache mapping GameObject InstanceID -> List of Groups it belongs to
@@ -121,30 +122,53 @@ namespace UnityTools.ObjectGrouper.Core
         {
             group.IsVisible = visible;
             
-            // Resolve objects and set active
-            // NOTE: Setting active state marks scene dirty. This is expected.
-            List<GameObject> objects = GetObjectsInGroup(group);
-            foreach (var obj in objects)
+            // Apply to objects directly in this group
+            ApplyVisibilityToObjects(group, visible);
+
+            // Apply recursively to children
+            var children = GetChildren(group);
+            foreach (var child in children)
             {
-                Undo.RecordObject(obj, visible ? "Show Group Objects" : "Hide Group Objects");
-                obj.SetActive(visible);
+                SetGroupVisibility(child, visible);
             }
             
             SaveData();
+        }
+
+        private void ApplyVisibilityToObjects(ObjectGroup group, bool visible)
+        {
+            List<GameObject> objects = GetObjectsInGroup(group);
+            foreach (var obj in objects)
+            {
+                if (obj == null) continue;
+                Undo.RecordObject(obj, visible ? "Show Group Objects" : "Hide Group Objects");
+                obj.SetActive(visible);
+            }
         }
         
         public void SetGroupLock(ObjectGroup group, bool locked)
         {
             group.IsLocked = locked;
             
+            // Apply to objects directly in this group
+            ApplyLockToObjects(group, locked);
+
+            // Apply recursively to children
+            var children = GetChildren(group);
+            foreach (var child in children)
+            {
+                SetGroupLock(child, locked);
+            }
+            
+            SaveData();
+        }
+
+        private void ApplyLockToObjects(ObjectGroup group, bool locked)
+        {
             List<GameObject> objects = GetObjectsInGroup(group);
             foreach (var obj in objects)
             {
-                // NotEditable flag prevents selection in Scene view but shows in Hierarchy used for locking
-                // Using HideFlags.NotEditable to simulate 'locking' in scene view is a common trick, 
-                // but it might hide it from Inspector too much. 
-                // A better approach for "Locking" usually involves SceneVisibilityManager in newer Unity versions.
-                
+                if (obj == null) continue;
 #if UNITY_2019_3_OR_NEWER
                 if (locked)
                     SceneVisibilityManager.instance.DisablePicking(obj, false);
@@ -152,8 +176,6 @@ namespace UnityTools.ObjectGrouper.Core
                     SceneVisibilityManager.instance.EnablePicking(obj, false);
 #endif
             }
-            
-            SaveData();
         }
 
         public List<GameObject> GetObjectsInGroup(ObjectGroup group)
@@ -185,6 +207,22 @@ namespace UnityTools.ObjectGrouper.Core
                 return groups;
             }
             return null;
+        }
+
+        public List<ObjectGroup> GetChildren(ObjectGroup parent)
+        {
+            return _currentData.Groups.Where(g => g.ParentID == parent.ID).ToList();
+        }
+
+        public List<ObjectGroup> GetRootGroups()
+        {
+            return _currentData.Groups.Where(g => string.IsNullOrEmpty(g.ParentID)).ToList();
+        }
+
+        public void SetGroupParent(ObjectGroup child, ObjectGroup parent)
+        {
+            child.ParentID = parent?.ID;
+            SaveData();
         }
 
         private void RebuildCache()
