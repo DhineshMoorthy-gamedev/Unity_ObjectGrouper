@@ -33,7 +33,7 @@ namespace UnityTools.ObjectGrouper.Core
         {
             EditorSceneManager.sceneOpened -= OnSceneOpened;
             EditorSceneManager.sceneClosed -= OnSceneClosed;
-            SaveData();
+            SaveGroupData();
         }
 
         private void OnSceneOpened(UnityEngine.SceneManagement.Scene scene, OpenSceneMode mode)
@@ -63,7 +63,8 @@ namespace UnityTools.ObjectGrouper.Core
                 AddObjectsToGroup(newGroup, initialObjects);
             }
 
-            SaveData();
+            SaveGroupData();
+            EditorApplication.RepaintHierarchyWindow();
             return newGroup;
         }
 
@@ -71,7 +72,8 @@ namespace UnityTools.ObjectGrouper.Core
         {
             _currentData.RemoveGroup(group);
             RebuildCache();
-            SaveData();
+            SaveGroupData();
+            EditorApplication.RepaintHierarchyWindow();
         }
 
         public void AddObjectsToGroup(ObjectGroup group, GameObject[] objects)
@@ -92,7 +94,8 @@ namespace UnityTools.ObjectGrouper.Core
             if (changed)
             {
                 RebuildCache();
-                SaveData();
+                SaveGroupData();
+                EditorApplication.RepaintHierarchyWindow();
             }
         }
 
@@ -114,25 +117,16 @@ namespace UnityTools.ObjectGrouper.Core
             if (changed)
             {
                 RebuildCache();
-                SaveData();
+                SaveGroupData();
+                EditorApplication.RepaintHierarchyWindow();
             }
         }
 
         public void SetGroupVisibility(ObjectGroup group, bool visible)
         {
             group.IsVisible = visible;
-            
-            // Apply to objects directly in this group
             ApplyVisibilityToObjects(group, visible);
-
-            // Apply recursively to children
-            var children = GetChildren(group);
-            foreach (var child in children)
-            {
-                SetGroupVisibility(child, visible);
-            }
-            
-            SaveData();
+            SaveGroupData();
         }
 
         private void ApplyVisibilityToObjects(ObjectGroup group, bool visible)
@@ -149,18 +143,8 @@ namespace UnityTools.ObjectGrouper.Core
         public void SetGroupLock(ObjectGroup group, bool locked)
         {
             group.IsLocked = locked;
-            
-            // Apply to objects directly in this group
             ApplyLockToObjects(group, locked);
-
-            // Apply recursively to children
-            var children = GetChildren(group);
-            foreach (var child in children)
-            {
-                SetGroupLock(child, locked);
-            }
-            
-            SaveData();
+            SaveGroupData();
         }
 
         private void ApplyLockToObjects(ObjectGroup group, bool locked)
@@ -209,21 +193,7 @@ namespace UnityTools.ObjectGrouper.Core
             return null;
         }
 
-        public List<ObjectGroup> GetChildren(ObjectGroup parent)
-        {
-            return _currentData.Groups.Where(g => g.ParentID == parent.ID).ToList();
-        }
 
-        public List<ObjectGroup> GetRootGroups()
-        {
-            return _currentData.Groups.Where(g => string.IsNullOrEmpty(g.ParentID)).ToList();
-        }
-
-        public void SetGroupParent(ObjectGroup child, ObjectGroup parent)
-        {
-            child.ParentID = parent?.ID;
-            SaveData();
-        }
 
         private void RebuildCache()
         {
@@ -254,7 +224,7 @@ namespace UnityTools.ObjectGrouper.Core
             }
         }
 
-        private void SaveData()
+        public void SaveGroupData()
         {
             string path = GetFilePath();
             string json = JsonUtility.ToJson(_currentData, true);

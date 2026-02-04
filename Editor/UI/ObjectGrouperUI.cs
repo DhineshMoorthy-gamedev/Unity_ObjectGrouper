@@ -12,7 +12,7 @@ namespace UnityTools.ObjectGrouper.UI
     public class ObjectGrouperUI
     {
         private int _currentTab = 0;
-        private string[] _tabs = { "Manual", "Smart", "Transform", "Settings" };
+        private string[] _tabs = { "Group", "Settings" };
         private Vector2 _scrollPosition;
         private string _newGroupName = "New Group";
         
@@ -20,15 +20,8 @@ namespace UnityTools.ObjectGrouper.UI
         private string _groupNamingTemplate = "Group_{type}_{count}";
         private int _nameCounter = 1;
         
-        // Transform State
-        private GroupTransformUtility.PivotMode _selectedPivotMode = GroupTransformUtility.PivotMode.Center;
-        private float _snapGridSize = 1.0f;
-        
-        // Smart Grouping State
-        private float _proximityThreshold = 1.0f;
-        private float _gridSize = 5.0f;
+        // Tag Grouping State
         private string _tagFilter = "Untagged";
-        private int _layerFilter = 0;
 
         public void Initialize()
         {
@@ -37,21 +30,19 @@ namespace UnityTools.ObjectGrouper.UI
 
         public void Draw()
         {
-            _currentTab = GUILayout.Toolbar(_currentTab, _tabs);
+            EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+            _currentTab = GUILayout.Toolbar(_currentTab, _tabs, GUILayout.Width(120));
+            GUILayout.FlexibleSpace();
+            GUILayout.Label("v1", EditorStyles.miniLabel);
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.HelpBox("Object Grouper: Organise your scene by grouping GameObjects. Use the Group tab to manage clusters and Settings for automation.", MessageType.Info);
             
             if (_currentTab == 0)
             {
                 DrawToolbar();
                 DrawGroupList();
                 DrawDropArea();
-            }
-            else if (_currentTab == 1)
-            {
-                DrawSmartGrouping();
-            }
-            else if (_currentTab == 2)
-            {
-                DrawTransformTools();
             }
             else
             {
@@ -75,6 +66,21 @@ namespace UnityTools.ObjectGrouper.UI
             }
 
             EditorGUILayout.Space();
+            GUILayout.Label("Tag-Based Grouping", EditorStyles.miniBoldLabel);
+
+            // Tag Grouping
+            _tagFilter = EditorGUILayout.TagField("Filter by Tag", _tagFilter);
+            if (GUILayout.Button("Group All in Scene by Tag"))
+            {
+                var allObjects = GameObject.FindObjectsOfType<GameObject>();
+                var filtered = GroupingEngine.FilterByTag(allObjects, _tagFilter);
+                if (filtered.Count > 0)
+                {
+                    ObjectGroupManager.instance.CreateGroup($"Tag_{_tagFilter}", filtered.ToArray());
+                }
+            }
+
+            EditorGUILayout.Space();
             GUILayout.Label("Batch Operations", EditorStyles.miniBoldLabel);
 
             if (GUILayout.Button("Cleanup Empty Groups"))
@@ -83,7 +89,7 @@ namespace UnityTools.ObjectGrouper.UI
                 int removed = 0;
                 foreach (var group in groups)
                 {
-                    if (group.ObjectGlobalIDs.Count == 0 && ObjectGroupManager.instance.GetChildren(group).Count == 0)
+                    if (group.ObjectGlobalIDs.Count == 0)
                     {
                         ObjectGroupManager.instance.DeleteGroup(group);
                         removed++;
@@ -108,111 +114,6 @@ namespace UnityTools.ObjectGrouper.UI
             int totalObjects = allGroups.Sum(g => g.ObjectGlobalIDs.Count);
             EditorGUILayout.LabelField("Total Groups", allGroups.Count.ToString());
             EditorGUILayout.LabelField("Total Objects in Groups", totalObjects.ToString());
-
-            EditorGUILayout.EndVertical();
-        }
-
-        private void DrawTransformTools()
-        {
-            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            GUILayout.Label("Transform & Pivot Tools", EditorStyles.boldLabel);
-            EditorGUILayout.Space();
-
-            _selectedPivotMode = (GroupTransformUtility.PivotMode)EditorGUILayout.EnumPopup("Pivot Mode", _selectedPivotMode);
-            
-            if (GUILayout.Button("Log Calculated Pivot (Selection)"))
-            {
-                Vector3 pivot = GroupTransformUtility.CalculatePivot(Selection.gameObjects, _selectedPivotMode);
-                Debug.Log($"Calculated {_selectedPivotMode} Pivot: {pivot}");
-            }
-
-            EditorGUILayout.Space();
-            GUILayout.Label("Snapping", EditorStyles.miniBoldLabel);
-            _snapGridSize = EditorGUILayout.FloatField("Snap Grid Size", _snapGridSize);
-            if (GUILayout.Button("Snap Selection to Grid"))
-            {
-                GroupTransformUtility.SnapToGrid(Selection.gameObjects, _snapGridSize);
-            }
-
-            EditorGUILayout.Space();
-            GUILayout.Label("Alignment", EditorStyles.miniBoldLabel);
-            if (GUILayout.Button("Align X (to Active Object)"))
-            {
-                if (Selection.activeGameObject != null)
-                    GroupTransformUtility.AlignObjects(Selection.gameObjects, Vector3.right, Selection.activeGameObject.transform.position.x);
-            }
-            if (GUILayout.Button("Align Y (to Active Object)"))
-            {
-                if (Selection.activeGameObject != null)
-                    GroupTransformUtility.AlignObjects(Selection.gameObjects, Vector3.up, Selection.activeGameObject.transform.position.y);
-            }
-            if (GUILayout.Button("Align Z (to Active Object)"))
-            {
-                if (Selection.activeGameObject != null)
-                    GroupTransformUtility.AlignObjects(Selection.gameObjects, Vector3.forward, Selection.activeGameObject.transform.position.z);
-            }
-
-            EditorGUILayout.EndVertical();
-        }
-
-        private void DrawSmartGrouping()
-        {
-            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            GUILayout.Label("Smart Grouping Tools", EditorStyles.boldLabel);
-            
-            EditorGUILayout.Space();
-
-            // Material Grouping
-            if (GUILayout.Button("Group Selection by Material"))
-            {
-                var groups = GroupingEngine.GroupByMaterial(Selection.gameObjects);
-                foreach (var kvp in groups)
-                {
-                    ObjectGroupManager.instance.CreateGroup($"Mat_{kvp.Key.name}", kvp.Value.ToArray());
-                }
-            }
-
-            EditorGUILayout.Space();
-
-            // Proximity Grouping
-            _proximityThreshold = EditorGUILayout.FloatField("Proximity Threshold", _proximityThreshold);
-            if (GUILayout.Button("Group Selection by Proximity"))
-            {
-                var clusters = GroupingEngine.GroupByProximity(Selection.gameObjects, _proximityThreshold);
-                int i = 1;
-                foreach (var cluster in clusters)
-                {
-                    ObjectGroupManager.instance.CreateGroup($"Cluster_{i++}", cluster.ToArray());
-                }
-            }
-
-            EditorGUILayout.Space();
-
-            // Grid Grouping
-            _gridSize = EditorGUILayout.FloatField("Grid Size", _gridSize);
-            if (GUILayout.Button("Group Selection by Grid"))
-            {
-                var cells = GroupingEngine.GroupByGrid(Selection.gameObjects, _gridSize);
-                foreach (var kvp in cells)
-                {
-                    ObjectGroupManager.instance.CreateGroup($"Grid_{kvp.Key.x}_{kvp.Key.y}_{kvp.Key.z}", kvp.Value.ToArray());
-                }
-            }
-
-            EditorGUILayout.Space();
-            GUILayout.Label("Automatic Scene Analysis", EditorStyles.miniBoldLabel);
-
-            // Tag Grouping
-            _tagFilter = EditorGUILayout.TagField("Filter by Tag", _tagFilter);
-            if (GUILayout.Button("Group All in Scene by Tag"))
-            {
-                var allObjects = GameObject.FindObjectsOfType<GameObject>();
-                var filtered = GroupingEngine.FilterByTag(allObjects, _tagFilter);
-                if (filtered.Count > 0)
-                {
-                    ObjectGroupManager.instance.CreateGroup($"Tag_{_tagFilter}", filtered.ToArray());
-                }
-            }
 
             EditorGUILayout.EndVertical();
         }
@@ -242,35 +143,28 @@ namespace UnityTools.ObjectGrouper.UI
 
         private void DrawGroupList()
         {
-            var rootGroups = ObjectGroupManager.instance.GetRootGroups();
+            var groups = ObjectGroupManager.instance.GetGroups();
             
             _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
             
-            if (rootGroups.Count == 0 && ObjectGroupManager.instance.GetGroups().Count == 0)
+            if (groups.Count == 0)
             {
                 EditorGUILayout.HelpBox("No groups created. Create one or drag objects here.", MessageType.Info);
             }
             else
             {
-                foreach (var group in rootGroups)
+                foreach (var group in groups)
                 {
-                    DrawGroupHierarchy(group, 0);
+                    DrawGroup(group);
                 }
             }
             
             EditorGUILayout.EndScrollView();
         }
 
-        private void DrawGroupHierarchy(ObjectGroup group, int indent)
+        private void DrawGroup(ObjectGroup group)
         {
-            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            
-            EditorGUI.indentLevel = indent;
-            
-            Rect headerRect = EditorGUILayout.BeginHorizontal();
-            
-            // Expansion Toggle
-            group.IsExpanded = EditorGUILayout.Foldout(group.IsExpanded, "", true);
+            EditorGUILayout.BeginHorizontal(EditorStyles.helpBox);
             
             // Visibility Toggle
             bool newVis = GUILayout.Toggle(group.IsVisible, "👁", EditorStyles.miniButton, GUILayout.Width(25));
@@ -287,10 +181,26 @@ namespace UnityTools.ObjectGrouper.UI
             }
 
             // Color Picker
-            group.GroupColor = EditorGUILayout.ColorField(group.GroupColor, GUILayout.Width(40));
+            EditorGUI.BeginChangeCheck();
+            var newColor = EditorGUILayout.ColorField(group.GroupColor, GUILayout.Width(40));
+            if (EditorGUI.EndChangeCheck())
+            {
+                Undo.RecordObject(ObjectGroupManager.instance, "Change Group Color");
+                group.GroupColor = newColor;
+                ObjectGroupManager.instance.SaveGroupData();
+                EditorApplication.RepaintHierarchyWindow();
+            }
 
             // Name
-            group.Name = EditorGUILayout.TextField(group.Name);
+            EditorGUI.BeginChangeCheck();
+            var newName = EditorGUILayout.TextField(group.Name);
+            if (EditorGUI.EndChangeCheck())
+            {
+                Undo.RecordObject(ObjectGroupManager.instance, "Change Group Name");
+                group.Name = newName;
+                ObjectGroupManager.instance.SaveGroupData();
+                EditorApplication.RepaintHierarchyWindow();
+            }
 
             // Select Objects Button
             if (GUILayout.Button("Select", EditorStyles.miniButton, GUILayout.Width(50)))
@@ -315,31 +225,13 @@ namespace UnityTools.ObjectGrouper.UI
             EditorGUILayout.EndHorizontal();
 
             // Drag and drop handling
-            HandleDragDrop(headerRect, group);
-
-            if (group.IsExpanded)
-            {
-                var children = ObjectGroupManager.instance.GetChildren(group);
-                foreach (var child in children)
-                {
-                    DrawGroupHierarchy(child, indent + 1);
-                }
-            }
-
-            EditorGUI.indentLevel = 0;
-            EditorGUILayout.EndVertical();
+            Rect lastRect = GUILayoutUtility.GetLastRect();
+            HandleDragDrop(lastRect, group);
         }
 
         private void ShowGroupContextMenu(ObjectGroup group)
         {
             GenericMenu menu = new GenericMenu();
-            
-            menu.AddItem(new GUIContent("Add New Subgroup"), false, () => {
-                var newSub = ObjectGroupManager.instance.CreateGroup("New Subgroup");
-                ObjectGroupManager.instance.SetGroupParent(newSub, group);
-            });
-            
-            menu.AddSeparator("");
             
             menu.AddItem(new GUIContent("Remove Selected Objects"), false, () => {
                 ObjectGroupManager.instance.RemoveObjectsFromGroup(group, Selection.gameObjects);
@@ -359,7 +251,7 @@ namespace UnityTools.ObjectGrouper.UI
 
         private void DrawDropArea()
         {
-            GUILayout.FlexibleSpace();
+            EditorGUILayout.Space();
             Rect dropRect = GUILayoutUtility.GetRect(0, 50, GUILayout.ExpandWidth(true));
             GUI.Box(dropRect, "Drag Objects Here to Create New Group", EditorStyles.helpBox);
             

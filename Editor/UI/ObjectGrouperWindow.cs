@@ -14,29 +14,6 @@ namespace UnityTools.ObjectGrouper.UI
             window.Show();
         }
 
-        [MenuItem("Tools/GameDevTools/Group Selected %g")]
-        public static void QuickGroup()
-        {
-            if (Selection.gameObjects.Length > 0)
-            {
-                Core.ObjectGroupManager.instance.CreateGroup($"QuickGroup_{Selection.activeGameObject.name}", Selection.gameObjects);
-            }
-        }
-
-        [MenuItem("Tools/GameDevTools/Select Objects in Group %#g")]
-        public static void QuickSelectGroup()
-        {
-             if (Selection.activeGameObject != null)
-             {
-                 var groups = Core.ObjectGroupManager.instance.GetGroupsForObject(Selection.activeGameObject);
-                 if (groups != null && groups.Count > 0)
-                 {
-                     var objs = Core.ObjectGroupManager.instance.GetObjectsInGroup(groups[0]);
-                     Selection.objects = objs.ToArray();
-                 }
-             }
-        }
-
         private void OnEnable()
         {
             ui.Initialize();

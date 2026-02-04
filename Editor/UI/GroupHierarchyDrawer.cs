@@ -24,19 +24,28 @@ namespace UnityTools.ObjectGrouper.UI
             List<ObjectGroup> groups = ObjectGroupManager.instance.GetGroupsForObject(obj);
             if (groups != null && groups.Count > 0)
             {
+                // Calculate the width of the GameObject's name
+                GUIContent nameContent = new GUIContent(obj.name);
+                GUIStyle labelStyle = new GUIStyle(EditorStyles.label);
+                float nameWidth = labelStyle.CalcSize(nameContent).x;
+                
+                // Calculate position: base position + name width + small padding
+                // selectionRect.x accounts for hierarchy indentation
+                float startX = selectionRect.x + nameWidth + 30;
+                
                 // Draw a colored dot for each group
-                Rect iconRect = new Rect(selectionRect.xMax - 10, selectionRect.y, 10, selectionRect.height);
+                Rect iconRect = new Rect(startX, selectionRect.y, 12, selectionRect.height);
                 
                 foreach (var group in groups)
                 {
-                    // Shift left for each group
-                    iconRect.x -= 12;
-                    
                     Color oldColor = GUI.color;
                     GUI.color = group.GroupColor;
                     string icon = group.IsLocked ? "🔒" : "●";
                     GUI.Label(iconRect, icon, EditorStyles.miniLabel); 
                     GUI.color = oldColor;
+                    
+                    // Move to the right for next group indicator
+                    iconRect.x += 12;
                 }
             }
         }
